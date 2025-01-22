@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include <stdbool.h>
 #include "FreeRTOS.h"
 #include "task.h"
 /* USER CODE END Includes */
@@ -57,6 +58,7 @@ static void BTN_handler(void* parameters);
 
 extern void SEGGER_UART_init(uint32_t);
 
+static bool is_all_task_in_suspension(void);
 TaskHandle_t task_green_handle;
 TaskHandle_t task_orange_handle;
 TaskHandle_t task_red_handle;
@@ -105,6 +107,7 @@ int main(void)
   SEGGER_UART_init(500000);
 
   SEGGER_SYSVIEW_Conf();
+  printf(" start here");
 
   status = xTaskCreate(LED_green_handler, "TASK_GREEN", 200, NULL, 3, &task_green_handle);
 
@@ -163,7 +166,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 8;
-  RCC_OscInitStruct.PLL.PLLN = 168;
+  RCC_OscInitStruct.PLL.PLLN = 50;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 7;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
@@ -176,11 +179,11 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV2;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
   {
     Error_Handler();
   }
@@ -330,6 +333,7 @@ static void LED_green_handler(void* parameters)
 	BaseType_t status;
 	while(1)
 	{
+		printf("%s\n", (char*)parameters);
 		// GREEN LED: LD12
 		SEGGER_SYSVIEW_PrintfTarget("Toggling green LED");
 		HAL_GPIO_TogglePin(GPIOD, LED_GREEN_PIN);
@@ -340,8 +344,9 @@ static void LED_green_handler(void* parameters)
 			next_task_handle = task_orange_handle;
 			xTaskResumeAll();
 			HAL_GPIO_WritePin(GPIOD, LED_GREEN_PIN, GPIO_PIN_SET);
-			SEGGER_SYSVIEW_PrintfTarget("Delete green task");
-			vTaskDelete(NULL);
+			//SEGGER_SYSVIEW_PrintfTarget("Delete green task");
+			//vTaskDelete(NULL);
+			vTaskSuspend(task_green_handle);
 		}
 	}
 }
@@ -351,6 +356,7 @@ static void LED_orange_handler(void* parameters)
 	BaseType_t status;
 	while(1)
 	{
+		printf("%s\n", (char*)parameters);
 		// ORANGE LED: LD13
 		SEGGER_SYSVIEW_PrintfTarget("Toggling orange LED");
 		HAL_GPIO_TogglePin(GPIOD, LED_ORANGE_PIN);
@@ -361,8 +367,9 @@ static void LED_orange_handler(void* parameters)
 			next_task_handle = task_red_handle;
 			xTaskResumeAll();
 			HAL_GPIO_WritePin(GPIOD, LED_ORANGE_PIN, GPIO_PIN_SET);
-			SEGGER_SYSVIEW_PrintfTarget("Delete orange task");
-			vTaskDelete(NULL);
+			//SEGGER_SYSVIEW_PrintfTarget("Delete orange task");
+			//vTaskDelete(NULL);
+			vTaskSuspend(task_orange_handle);
 		}
 	}
 }
@@ -372,6 +379,7 @@ static void LED_red_handler(void* parameters)
 	BaseType_t status;
 	while(1)
 	{
+		printf("%s\n", (char*)parameters);
 		// RED LED: LD14
 		SEGGER_SYSVIEW_PrintfTarget("Toggling red LED");
 		HAL_GPIO_TogglePin(GPIOD, LED_RED_PIN);
@@ -383,9 +391,10 @@ static void LED_red_handler(void* parameters)
 			xTaskResumeAll();
 			HAL_GPIO_WritePin(GPIOD, LED_RED_PIN, GPIO_PIN_SET);
 			SEGGER_SYSVIEW_PrintfTarget("Delete button task");
-			vTaskDelete(task_btn_handle);
-			SEGGER_SYSVIEW_PrintfTarget("Delete Red task");
-			vTaskDelete(NULL);
+			//vTaskDelete(task_btn_handle);
+			//SEGGER_SYSVIEW_PrintfTarget("Delete Red task");
+			//vTaskDelete(NULL);
+			vTaskSuspend(task_red_handle);
 		}
 	}
 }
@@ -402,11 +411,41 @@ static void BTN_handler(void* parameters)
 		if(btn_read)
 		{
 			if(! prev_read)
-				xTaskNotify(next_task_handle, 0, eNoAction);
+			{
+				if(is_all_task_in_suspension())
+				{
+					vTaskResume(task_green_handle);
+					vTaskResume(task_orange_handle);
+					vTaskResume(task_red_handle);
+				}
+				else
+				{
+					xTaskNotify(next_task_handle, 0, eNoAction);
+				}
+			}
 		}
 		prev_read = btn_read;
 		vTaskDelay(pdMS_TO_TICKS(10));
 	}
+}
+
+static bool is_all_task_in_suspension(void)
+{
+	TaskStatus_t greenTaskDetail;
+	TaskStatus_t orangeTaskDetail;
+	TaskStatus_t redTaskDetail;
+
+	vTaskGetInfo(task_green_handle, &greenTaskDetail, pdTRUE, eInvalid);
+	vTaskGetInfo(task_orange_handle, &orangeTaskDetail, pdTRUE, eInvalid);
+	vTaskGetInfo(task_red_handle, &redTaskDetail, pdTRUE, eInvalid);
+
+	if ((greenTaskDetail.eCurrentState == eSuspended) & (orangeTaskDetail.eCurrentState == eSuspended) & (redTaskDetail.eCurrentState == eSuspended))
+	{
+		printf("All task are suspended");
+		return true;
+	}
+	printf("some task is not suspended");
+	return false;
 }
 /* USER CODE END 4 */
 
