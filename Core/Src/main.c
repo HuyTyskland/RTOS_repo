@@ -417,6 +417,7 @@ static void BTN_handler(void* parameters)
 					vTaskResume(task_green_handle);
 					vTaskResume(task_orange_handle);
 					vTaskResume(task_red_handle);
+					next_task_handle = task_green_handle;
 				}
 				else
 				{
