@@ -106,7 +106,7 @@ int main(void)
 
   SEGGER_SYSVIEW_Conf();
 
-  status = xTaskCreate(LED_green_handler, "TASK_GREEN", 200, NULL, 3, &task_green_handle);
+  status = xTaskCreate(LED_green_handler, "TASK_GREEN", 200, NULL, 4, &task_green_handle);
 
   configASSERT(status == pdPASS);
 
