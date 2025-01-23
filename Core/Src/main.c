@@ -327,8 +327,14 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void button_interrupt_handler(void)
 {
+	BaseType_t pxHigherPriorityTaskWoken;
+
+	pxHigherPriorityTaskWoken = pdFALSE;
+
 	traceISR_ENTER();
-	xTaskNotifyFromISR(next_task_handle,0,eNoAction,NULL);
+	xTaskNotifyFromISR(next_task_handle,0,eNoAction,&pxHigherPriorityTaskWoken);
+
+	portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 	traceISR_EXIT();
 }
 
