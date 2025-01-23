@@ -45,23 +45,21 @@
 
 /* USER CODE BEGIN PV */
 #define DWT_CTRL (*(volatile uint32_t*)0xE0001000)
+volatile BaseType_t is_button_pressed = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 /* USER CODE BEGIN PFP */
-static void LED_green_handler(void* parameters);
-static void LED_orange_handler(void* parameters);
-static void LED_red_handler(void* parameters);
+static void task1_handler(void* parameters);
+static void task2_handler(void* parameters);
+static void switch_priority(void);
 
 extern void SEGGER_UART_init(uint32_t);
 
-TaskHandle_t task_green_handle;
-TaskHandle_t task_orange_handle;
-TaskHandle_t task_red_handle;
-
-TaskHandle_t volatile next_task_handle = NULL;
+TaskHandle_t task_1;
+TaskHandle_t task_2;
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -106,17 +104,11 @@ int main(void)
   SEGGER_SYSVIEW_Conf();
   printf(" start here");
 
-  status = xTaskCreate(LED_green_handler, "TASK_GREEN", 200, NULL, 3, &task_green_handle);
+  status = xTaskCreate(task1_handler, "TASK_1", 200, NULL, 2, &task_1);
 
   configASSERT(status == pdPASS);
 
-  next_task_handle = task_green_handle;
-
-  status = xTaskCreate(LED_orange_handler, "TASK_ORANGE", 200, NULL, 2, &task_orange_handle);
-
-  configASSERT(status == pdPASS);
-
-  status = xTaskCreate(LED_red_handler, "TASK_RED", 200, NULL, 1, &task_red_handle);
+  status = xTaskCreate(task2_handler, "TASK_2", 200, NULL, 3, &task_2);
 
   configASSERT(status == pdPASS);
 
@@ -325,84 +317,64 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+static void switch_priority(void)
+{
+	BaseType_t is_time_to_switch_priority = 0;
+	UBaseType_t p1, p2;
+	TaskHandle_t current_task_handle, t1, t2;
+	portENTER_CRITICAL();
+	if(is_button_pressed)
+	{
+		is_button_pressed = 0;
+		is_time_to_switch_priority = 1;
+	}
+	portEXIT_CRITICAL();
+
+	if(is_time_to_switch_priority)
+	{
+		t1 = xTaskGetHandle("TASK_1");
+		t2 = xTaskGetHandle("TASK_2");
+
+		p1 = uxTaskPriorityGet(t1);
+		p2 = uxTaskPriorityGet(t2);
+
+		current_task_handle = xTaskGetCurrentTaskHandle();
+
+		if(current_task_handle == t1)
+		{
+			vTaskPrioritySet(t1, p2);
+			vTaskPrioritySet(t2, p1);
+		}
+		else
+		{
+			vTaskPrioritySet(t2, p1);
+			vTaskPrioritySet(t1, p2);
+		}
+	}
+}
+
 void button_interrupt_handler(void)
 {
-	BaseType_t pxHigherPriorityTaskWoken;
-
-	pxHigherPriorityTaskWoken = pdFALSE;
-
-	traceISR_ENTER();
-	xTaskNotifyFromISR(next_task_handle,0,eNoAction,&pxHigherPriorityTaskWoken);
-
-	portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
-	traceISR_EXIT();
+	is_button_pressed = 1;
 }
 
-static void LED_green_handler(void* parameters)
+static void task1_handler(void* parameters)
 {
-	BaseType_t status;
 	while(1)
 	{
-		printf("%s\n", (char*)parameters);
-		// GREEN LED: LD12
-		SEGGER_SYSVIEW_PrintfTarget("Toggling green LED");
-		HAL_GPIO_TogglePin(GPIOD, LED_GREEN_PIN);
-		status = xTaskNotifyWait(0, 0, NULL, pdMS_TO_TICKS(1000));
-		if(status == pdTRUE)
-		{
-			portENTER_CRITICAL();
-			next_task_handle = task_orange_handle;
-			HAL_GPIO_WritePin(GPIOD, LED_GREEN_PIN, GPIO_PIN_SET);
-			//SEGGER_SYSVIEW_PrintfTarget("Delete green task");
-			portEXIT_CRITICAL();
-			vTaskDelete(NULL);
-		}
-	}
-}
-
-static void LED_orange_handler(void* parameters)
-{
-	BaseType_t status;
-	while(1)
-	{
-		printf("%s\n", (char*)parameters);
-		// ORANGE LED: LD13
-		SEGGER_SYSVIEW_PrintfTarget("Toggling orange LED");
-		HAL_GPIO_TogglePin(GPIOD, LED_ORANGE_PIN);
-		status = xTaskNotifyWait(0, 0, NULL, pdMS_TO_TICKS(800));
-		if(status == pdTRUE)
-		{
-			portENTER_CRITICAL();
-			next_task_handle = task_red_handle;
-			HAL_GPIO_WritePin(GPIOD, LED_ORANGE_PIN, GPIO_PIN_SET);
-			//SEGGER_SYSVIEW_PrintfTarget("Delete orange task");
-			portEXIT_CRITICAL();
-			vTaskDelete(NULL);
-		}
-	}
-}
-
-static void LED_red_handler(void* parameters)
-{
-	BaseType_t status;
-	while(1)
-	{
-		printf("%s\n", (char*)parameters);
-		// RED LED: LD14
-		SEGGER_SYSVIEW_PrintfTarget("Toggling red LED");
 		HAL_GPIO_TogglePin(GPIOD, LED_RED_PIN);
-		status =  xTaskNotifyWait(0, 0, NULL, pdMS_TO_TICKS(400));
-		if(status == pdTRUE)
-		{
-			portENTER_CRITICAL();
-			next_task_handle = NULL;
-			HAL_GPIO_WritePin(GPIOD, LED_RED_PIN, GPIO_PIN_SET);
-			SEGGER_SYSVIEW_PrintfTarget("Delete button task");
-			//vTaskDelete(task_btn_handle);
-			//SEGGER_SYSVIEW_PrintfTarget("Delete Red task");
-			portEXIT_CRITICAL();
-			vTaskDelete(NULL);
-		}
+		vTaskDelay(pdMS_TO_TICKS(1000));
+		switch_priority();
+	}
+}
+
+static void task2_handler(void* parameters)
+{
+	while(1)
+	{
+		HAL_GPIO_TogglePin(GPIOD, LED_GREEN_PIN);
+		vTaskDelay(pdMS_TO_TICKS(100));
+		switch_priority();
 	}
 }
 /* USER CODE END 4 */
