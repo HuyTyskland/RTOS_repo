@@ -54,15 +54,12 @@ static void MX_GPIO_Init(void);
 static void LED_green_handler(void* parameters);
 static void LED_orange_handler(void* parameters);
 static void LED_red_handler(void* parameters);
-static void BTN_handler(void* parameters);
 
 extern void SEGGER_UART_init(uint32_t);
 
-static bool is_all_task_in_suspension(void);
 TaskHandle_t task_green_handle;
 TaskHandle_t task_orange_handle;
 TaskHandle_t task_red_handle;
-TaskHandle_t task_btn_handle;
 
 TaskHandle_t volatile next_task_handle = NULL;
 /* USER CODE END PFP */
@@ -120,10 +117,6 @@ int main(void)
   configASSERT(status == pdPASS);
 
   status = xTaskCreate(LED_red_handler, "TASK_RED", 200, NULL, 1, &task_red_handle);
-
-  configASSERT(status == pdPASS);
-
-  status = xTaskCreate(BTN_handler, "TASK_BTN", 200, NULL, 4, &task_btn_handle);
 
   configASSERT(status == pdPASS);
 
@@ -240,7 +233,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
@@ -325,9 +318,20 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(MEMS_INT2_GPIO_Port, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 6, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
 }
 
 /* USER CODE BEGIN 4 */
+void button_interrupt_handler(void)
+{
+	traceISR_ENTER();
+	xTaskNotifyFromISR(next_task_handle,0,eNoAction,NULL);
+	traceISR_EXIT();
+}
+
 static void LED_green_handler(void* parameters)
 {
 	BaseType_t status;
@@ -340,13 +344,12 @@ static void LED_green_handler(void* parameters)
 		status = xTaskNotifyWait(0, 0, NULL, pdMS_TO_TICKS(1000));
 		if(status == pdTRUE)
 		{
-			vTaskSuspendAll();
+			portENTER_CRITICAL();
 			next_task_handle = task_orange_handle;
-			xTaskResumeAll();
 			HAL_GPIO_WritePin(GPIOD, LED_GREEN_PIN, GPIO_PIN_SET);
 			//SEGGER_SYSVIEW_PrintfTarget("Delete green task");
-			//vTaskDelete(NULL);
-			vTaskSuspend(task_green_handle);
+			portEXIT_CRITICAL();
+			vTaskDelete(NULL);
 		}
 	}
 }
@@ -363,13 +366,12 @@ static void LED_orange_handler(void* parameters)
 		status = xTaskNotifyWait(0, 0, NULL, pdMS_TO_TICKS(800));
 		if(status == pdTRUE)
 		{
-			vTaskSuspendAll();
+			portENTER_CRITICAL();
 			next_task_handle = task_red_handle;
-			xTaskResumeAll();
 			HAL_GPIO_WritePin(GPIOD, LED_ORANGE_PIN, GPIO_PIN_SET);
 			//SEGGER_SYSVIEW_PrintfTarget("Delete orange task");
-			//vTaskDelete(NULL);
-			vTaskSuspend(task_orange_handle);
+			portEXIT_CRITICAL();
+			vTaskDelete(NULL);
 		}
 	}
 }
@@ -383,70 +385,19 @@ static void LED_red_handler(void* parameters)
 		// RED LED: LD14
 		SEGGER_SYSVIEW_PrintfTarget("Toggling red LED");
 		HAL_GPIO_TogglePin(GPIOD, LED_RED_PIN);
-		status = xTaskNotifyWait(0, 0, NULL, pdMS_TO_TICKS(400));
+		status =  xTaskNotifyWait(0, 0, NULL, pdMS_TO_TICKS(400));
 		if(status == pdTRUE)
 		{
-			vTaskSuspendAll();
+			portENTER_CRITICAL();
 			next_task_handle = NULL;
-			xTaskResumeAll();
 			HAL_GPIO_WritePin(GPIOD, LED_RED_PIN, GPIO_PIN_SET);
 			SEGGER_SYSVIEW_PrintfTarget("Delete button task");
 			//vTaskDelete(task_btn_handle);
 			//SEGGER_SYSVIEW_PrintfTarget("Delete Red task");
-			//vTaskDelete(NULL);
-			vTaskSuspend(task_red_handle);
+			portEXIT_CRITICAL();
+			vTaskDelete(NULL);
 		}
 	}
-}
-
-static void BTN_handler(void* parameters)
-{
-	uint8_t btn_read = 0;
-	uint8_t prev_read = 0;
-
-	while(1)
-	{
-		btn_read = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0);
-
-		if(btn_read)
-		{
-			if(! prev_read)
-			{
-				if(is_all_task_in_suspension())
-				{
-					vTaskResume(task_green_handle);
-					vTaskResume(task_orange_handle);
-					vTaskResume(task_red_handle);
-					next_task_handle = task_green_handle;
-				}
-				else
-				{
-					xTaskNotify(next_task_handle, 0, eNoAction);
-				}
-			}
-		}
-		prev_read = btn_read;
-		vTaskDelay(pdMS_TO_TICKS(10));
-	}
-}
-
-static bool is_all_task_in_suspension(void)
-{
-	TaskStatus_t greenTaskDetail;
-	TaskStatus_t orangeTaskDetail;
-	TaskStatus_t redTaskDetail;
-
-	vTaskGetInfo(task_green_handle, &greenTaskDetail, pdTRUE, eInvalid);
-	vTaskGetInfo(task_orange_handle, &orangeTaskDetail, pdTRUE, eInvalid);
-	vTaskGetInfo(task_red_handle, &redTaskDetail, pdTRUE, eInvalid);
-
-	if ((greenTaskDetail.eCurrentState == eSuspended) & (orangeTaskDetail.eCurrentState == eSuspended) & (redTaskDetail.eCurrentState == eSuspended))
-	{
-		printf("All task are suspended");
-		return true;
-	}
-	printf("some task is not suspended");
-	return false;
 }
 /* USER CODE END 4 */
 
