@@ -99,16 +99,14 @@ int main(void)
   // enable CYCCNT counter
   DWT_CTRL |= (1 << 0);
 
-  SEGGER_UART_init(500000);
-
   SEGGER_SYSVIEW_Conf();
-  printf(" start here");
+  SEGGER_SYSVIEW_Start();
 
-  status = xTaskCreate(task1_handler, "TASK_1", 200, NULL, 2, &task_1);
+  status = xTaskCreate(task1_handler, "TASK_1", 200, "RED LED", 2, &task_1);
 
   configASSERT(status == pdPASS);
 
-  status = xTaskCreate(task2_handler, "TASK_2", 200, NULL, 3, &task_2);
+  status = xTaskCreate(task2_handler, "TASK_2", 200, "GREEN LED", 3, &task_2);
 
   configASSERT(status == pdPASS);
 
@@ -360,8 +358,11 @@ void button_interrupt_handler(void)
 
 static void task1_handler(void* parameters)
 {
+	char msg[100];
 	while(1)
 	{
+		snprintf(msg, 100, "%s\n", (char*)parameters);
+		SEGGER_SYSVIEW_PrintfTarget(msg);
 		HAL_GPIO_TogglePin(GPIOD, LED_RED_PIN);
 		vTaskDelay(pdMS_TO_TICKS(1000));
 		switch_priority();
@@ -370,8 +371,11 @@ static void task1_handler(void* parameters)
 
 static void task2_handler(void* parameters)
 {
+	char msg[100];
 	while(1)
 	{
+		snprintf(msg, 100, "%s\n", (char*)parameters);
+		SEGGER_SYSVIEW_PrintfTarget(msg);
 		HAL_GPIO_TogglePin(GPIOD, LED_GREEN_PIN);
 		vTaskDelay(pdMS_TO_TICKS(100));
 		switch_priority();

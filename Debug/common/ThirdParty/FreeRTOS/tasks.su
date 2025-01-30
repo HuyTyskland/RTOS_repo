@@ -1,6 +1,6 @@
 D:/Self-development/RTOS/RTOS_workspace/common/ThirdParty/FreeRTOS/tasks.c:721:16:xTaskCreate	56	static
 D:/Self-development/RTOS/RTOS_workspace/common/ThirdParty/FreeRTOS/tasks.c:816:13:prvInitialiseNewTask	40	static,ignoring_inline_asm
-D:/Self-development/RTOS/RTOS_workspace/common/ThirdParty/FreeRTOS/tasks.c:1026:13:prvAddNewTaskToReadyList	40	static
+D:/Self-development/RTOS/RTOS_workspace/common/ThirdParty/FreeRTOS/tasks.c:1026:13:prvAddNewTaskToReadyList	40	static,ignoring_inline_asm
 D:/Self-development/RTOS/RTOS_workspace/common/ThirdParty/FreeRTOS/tasks.c:1112:10:vTaskDelete	24	static,ignoring_inline_asm
 D:/Self-development/RTOS/RTOS_workspace/common/ThirdParty/FreeRTOS/tasks.c:1214:16:xTaskDelayUntil	48	static,ignoring_inline_asm
 D:/Self-development/RTOS/RTOS_workspace/common/ThirdParty/FreeRTOS/tasks.c:1301:10:vTaskDelay	24	static,ignoring_inline_asm
@@ -23,6 +23,7 @@ D:/Self-development/RTOS/RTOS_workspace/common/ThirdParty/FreeRTOS/tasks.c:2340:
 D:/Self-development/RTOS/RTOS_workspace/common/ThirdParty/FreeRTOS/tasks.c:2354:20:prvSearchForNameWithinSingleList	48	static
 D:/Self-development/RTOS/RTOS_workspace/common/ThirdParty/FreeRTOS/tasks.c:2425:18:xTaskGetHandle	32	static,ignoring_inline_asm
 D:/Self-development/RTOS/RTOS_workspace/common/ThirdParty/FreeRTOS/tasks.c:2489:17:uxTaskGetSystemState	32	static
+D:/Self-development/RTOS/RTOS_workspace/common/ThirdParty/FreeRTOS/tasks.c:2564:18:xTaskGetIdleTaskHandle	16	static,ignoring_inline_asm
 D:/Self-development/RTOS/RTOS_workspace/common/ThirdParty/FreeRTOS/tasks.c:2616:12:xTaskCatchUpTicks	24	static,ignoring_inline_asm
 D:/Self-development/RTOS/RTOS_workspace/common/ThirdParty/FreeRTOS/tasks.c:2720:12:xTaskIncrementTick	48	static,ignoring_inline_asm
 D:/Self-development/RTOS/RTOS_workspace/common/ThirdParty/FreeRTOS/tasks.c:3009:6:vTaskSwitchContext	32	static,ignoring_inline_asm
